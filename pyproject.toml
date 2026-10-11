@@ -1,0 +1,14 @@
+[project]
+name = "oolel"
+version = "0.1.0"
+description = "Wolof speech and language services on the open Oolel models, served from Modal"
+requires-python = ">=3.11"
+dependencies = ["fastapi[standard]>=0.110"]
+
+[project.optional-dependencies]
+test = ["pytest", "httpx"]
+deploy = ["modal"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
