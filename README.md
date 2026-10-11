@@ -7,7 +7,7 @@ routes `llm_soynade` calls, so that provider only needs its `api_base` and API k
 | Capability | Route | Model | Status |
 |---|---|---|---|
 | Text-to-speech | `POST /v1/text-to-speech` | Oolel-Voices | live |
-| Speech-to-text | `POST /v1/audio/transcriptions` | Wolof-HuBERT-CTC | planned |
+| Speech-to-text | `POST /v1/audio/transcriptions` | Wolof-HuBERT-CTC | live |
 | Translation | `POST /v1/translations` | Oolel | planned |
 
 `GET /health` is open and lists the capabilities being served. Everything else needs
@@ -20,6 +20,13 @@ Returns the audio. Wolof only (`language` other than `wo` is a 400) and one fixe
 `voice.wav`; any `reference_audio` is a 400. English and French from these weights are unusable: keep the
 Soynade API for them. CPU only: about 20 s for a short line, one line at a time per container, two
 containers at most, idle containers stop after 5 minutes (the next call then waits about a minute).
+
+## Speech-to-text
+
+Multipart `file` (any audio ffmpeg reads, up to 25 MB and 10 minutes), optional `language` (only `wo`),
+`response_format` (json|text). `temperature` is accepted and ignored: the recognizer is deterministic.
+Returns `{"text", "language", "duration"}`. Wolof only. The model card reports a word error rate of about
+36%, so treat the text as a draft. Long audio is read in 30 s windows. CPU only.
 
 ## Adding a capability
 

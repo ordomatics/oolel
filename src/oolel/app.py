@@ -2,11 +2,11 @@ import hmac
 
 from fastapi import Depends, FastAPI, Request
 
-from . import tts
+from . import stt, tts
 from .errors import ApiError, handle_api_error
 
 
-def make_app(token, tts_backend=None):
+def make_app(token, tts_backend=None, stt_backend=None):
     """One gateway for every Oolel capability. A capability is served only if its backend is given."""
     app = FastAPI()
     app.add_exception_handler(ApiError, handle_api_error)
@@ -20,6 +20,9 @@ def make_app(token, tts_backend=None):
     if tts_backend:
         app.include_router(tts.router(tts_backend), dependencies=[Depends(authorized)])
         capabilities.append("text-to-speech")
+    if stt_backend:
+        app.include_router(stt.router(stt_backend), dependencies=[Depends(authorized)])
+        capabilities.append("speech-to-text")
 
     @app.get("/health")
     def health():

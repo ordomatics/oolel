@@ -17,6 +17,10 @@ tts_image = (
                  "pyloudnorm")
     .add_local_file("voice.wav", "/app/voice.wav")
 )
+stt_image = (
+    modal.Image.debian_slim(python_version="3.11")
+    .pip_install("torch", "transformers>=4.46", "numpy", "huggingface_hub", "safetensors")
+)
 app = modal.App("oolel")
 cache = modal.Volume.from_name("oolel-hf-cache", create_if_missing=True)
 
@@ -47,8 +51,28 @@ class Tts:
         return buffer.getvalue()
 
 
+@app.cls(image=stt_image, cpu=4, memory=8192, volumes={"/root/.cache/huggingface": cache},
+         scaledown_window=300, max_containers=2, timeout=900)
+@modal.concurrent(max_inputs=1)
+class Stt:
+    @modal.enter()
+    def load(self):
+        import numpy as np
+        from transformers import pipeline
+        self.asr = pipeline("automatic-speech-recognition", model="soynade-research/Wolof-HuBERT-CTC",
+                            chunk_length_s=30, stride_length_s=(5, 5))
+        self.asr({"raw": np.zeros(16000, dtype="float32"), "sampling_rate": 16000})  # warm up
+
+    @modal.method()
+    def transcribe(self, pcm):
+        import numpy as np
+        return self.asr({"raw": np.frombuffer(pcm, dtype="float32").copy(), "sampling_rate": 16000})["text"]
+
+
 @app.function(image=gateway_image, secrets=[modal.Secret.from_name("oolel")], scaledown_window=120)
 @modal.asgi_app()
 def web():
     from oolel.app import make_app
-    return make_app(os.environ["OOLEL_TOKEN"], tts_backend=lambda *args, **kw: Tts().speak.remote(*args, **kw))
+    return make_app(os.environ["OOLEL_TOKEN"],
+                    tts_backend=lambda *args, **kw: Tts().speak.remote(*args, **kw),
+                    stt_backend=lambda pcm: Stt().transcribe.remote(pcm))
