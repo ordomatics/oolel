@@ -1,6 +1,7 @@
 import subprocess
 
 from fastapi import APIRouter, Request, Response
+from starlette.concurrency import run_in_threadpool
 
 from .errors import ApiError, read_body
 
@@ -48,7 +49,9 @@ def router(synthesize):
         except (TypeError, ValueError):
             raise ApiError(400, "INVALID_PARAMETER", "seed must be an integer.")
 
-        audio = synthesize(text, seed, **values)
-        return Response(_mp3(audio) if fmt == "mp3" else audio, media_type=FORMATS[fmt])
+        audio = await run_in_threadpool(synthesize, text, seed, **values)
+        if fmt == "mp3":
+            audio = await run_in_threadpool(_mp3, audio)
+        return Response(audio, media_type=FORMATS[fmt])
 
     return api

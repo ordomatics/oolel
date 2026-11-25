@@ -1,6 +1,7 @@
 import subprocess
 
 from fastapi import APIRouter, Form, Request, Response, UploadFile
+from starlette.concurrency import run_in_threadpool
 
 from .errors import ApiError
 
@@ -36,11 +37,11 @@ def router(transcribe):
         if len(data) > MAX_BYTES:
             raise ApiError(413, "FILE_TOO_LARGE", f"The file is over {MAX_BYTES // 1024 // 1024} MB.")
 
-        pcm = _pcm(data)
+        pcm = await run_in_threadpool(_pcm, data)
         seconds = len(pcm) / (SAMPLE_RATE * 4)
         if seconds > MAX_SECONDS:
             raise ApiError(400, "AUDIO_TOO_LONG", f"The audio is over {MAX_SECONDS} seconds.")
-        text = transcribe(pcm).strip()
+        text = (await run_in_threadpool(transcribe, pcm)).strip()
         if response_format == "text":
             return Response(text, media_type="text/plain")
         return {"text": text, "language": LANGUAGE, "duration": round(seconds, 2)}
